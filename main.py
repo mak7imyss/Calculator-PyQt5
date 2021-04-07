@@ -5,18 +5,25 @@ from math import sqrt
 
 
 class MainWindow(QMainWindow, calc.Ui_MainWindow):
-    text = ''
-    history = None
-    point = False
+    text: str = ''
+    value: str = ''
+    try_history: str = ''
+    point: bool = False
+    root: bool = False
+    depth: int = 0
+    buffer: float = 0
+    operator: str = ''
+    pre_operation: str = ''
+    n:int = 1
 
     def __init__(self):
         QMainWindow.__init__(self)
         self.setupUi(self)
-        # super(Calc, self).__init__(*args, **kwargs)
-        # self.setupUi(self)
+        # Setup buttons numpad
         for i in range(10):
-            getattr(self, f'btn_{i}').pressed.connect(lambda n=i: self.input_num(n))
-        self.btn_point.pressed.connect(lambda: self.input_num(self.btn_point.text()))
+            getattr(self, f'btn_{i}').pressed.connect(lambda n=i: self.numpad(n))
+        # Setup other buttons
+        self.btn_point.pressed.connect(lambda: self.real())
 
         self.btn_equal.pressed.connect(lambda: self.equal())
         self.btn_plus.pressed.connect(lambda: self.operation('+'))
@@ -26,63 +33,114 @@ class MainWindow(QMainWindow, calc.Ui_MainWindow):
 
         self.btn_backspace.pressed.connect(lambda: self.backspace())
         self.btn_C.pressed.connect(lambda: self.clear())
-        self.btn_sqrt.pressed.connect(lambda: self.input_num(self.btn_sqrt.text()))
-        self.btn_percent.pressed.connect(lambda: self.operation('/100*'))
-        # self.btn_0.clicked.connect(lambda: self.input_num(self.btn_0.text()))
-        # self.btn_1.clicked.connect(lambda: self.input_num(self.btn_1.text()))
-        # self.btn_2.clicked.connect(lambda: self.input_num(self.btn_2.text()))
-        # self.btn_3.clicked.connect(lambda: self.input_num(self.btn_3.text()))
-        # self.btn_4.clicked.connect(lambda: self.input_num(self.btn_4.text()))
-        # self.btn_5.clicked.connect(lambda: self.input_num(self.btn_5.text()))
-        # self.btn_6.clicked.connect(lambda: self.input_num(self.btn_6.text()))
-        # self.btn_7.clicked.connect(lambda: self.input_num(self.btn_7.text()))
-        # self.btn_8.clicked.connect(lambda: self.input_num(self.btn_8.text()))
-        # self.btn_9.clicked.connect(lambda: self.input_num(self.btn_9.text()))
+        self.btn_sqrt.pressed.connect(lambda: self.sqrt())
+        self.btn_percent.pressed.connect(lambda: self.operation('%'))
         self.show()
 
-    def equal(self):
-        result = eval(f'{self.history}{self.label_score.text()}')
-        self.history = None
-        self.text = result
-        self.label_history.setText(str(result))
-        self.label_score.setText('')
+    def clear(self, zero=None):
+        self.text = '0'
+        self.value = ''
+        self.operator = ''
+        self.setScore()
+        if zero is None:
+            self.setHistory()
+        else:
+            self.label_history.setText('N/a')
+        self.root = False
         self.point = False
-
-    def clear(self):
-        self.history = None
-        self.label_history.setText(None)
-        self.label_score.setText('0')
 
     def backspace(self):
-        if self.label_score.text() != '':
-            self.text = self.text[0:-1]
-            self.label_score.setText(self.text)
+        self.text = self.text[:-1]
+        self.setScore()
 
-    def score(self, num):
-        pre_text = self.label_score.text()
-        if pre_text == '0':
-            pre_text = ''
-        self.text = f'{pre_text}{num}'
-        self.label_score.setText(self.text)
-
-    def input_num(self, num):
-        if num == '.' and self.point:
-            num = ''
-        if num == '.' and not self.point:
+    def real(self):
+        if not self.point:
             self.point = True
-        self.score(num)
+            self.score('.')
 
-    def operation(self, op):
-        if self.history is None:
-            self.history = f'{self.text}{op}'
-        else:
-            result = eval(f'{self.history}{self.text}')
-            self.label_score.setText(self.history)
-            self.history = f'{result}{op}'
-        self.label_history.setText(self.history)
-        self.label_score.setText('0')
+    def numpad(self, num: int):
+        self.score(str(num))
+
+    def operation(self, operator: str = ''):
+        # Move the operators
+        self.pre_operation = self.operator
+        self.operator = operator
+        self.history()
+        # Reset score
+        self.text = '0'
+        self.setScore()
         self.point = False
 
+    def equal(self):
+        if self.point:
+            setup: set = set(self.text.split('.')).discard('0')
+            if len(setup) == 0:
+                self.accuracy()
+        self.operation()
+
+    def sqrt(self):
+        if not self.root:
+            self.root = True
+            self.score('√')
+
+    def history(self):
+        try:
+            # Setup the first value
+            if self.value == '' and not self.root:
+                self.value = f'{self.text}{self.operator}'
+            elif self.pre_operation == '%':
+                self.value = f'{self.buffer}{self.operator}'
+            # Calculate
+            elif self.root:
+                self.buffer = round(eval(f'{self.value[:-1]}{self.pre_operation}{sqrt(self.text[1:])}')+0.1,self.n)
+                self.value = str(self.buffer)
+                self.root = False
+            elif self.operator == '%':
+                percent = eval(f'{self.value[:-1]}/100*{self.text}')
+                switch = {
+                    '*': percent,
+                    '+': f'{self.value}{percent}',
+                    '-': f'{self.value}{percent}',
+                    '/': f'{self.value[:-1]}*{percent}',
+                }
+                self.buffer = round(eval(f'{switch.get(self.pre_operation)}')+0.1,self.n)
+                self.value = str(self.buffer)
+                print('self')
+                print(self.pre_operation)
+            else:
+                self.buffer = round(eval(f'{self.value[:-1]}{self.pre_operation}{self.text}')+0.1,self.n)
+                self.value = f'{self.buffer}{self.operator}'
+            self.setHistory()
+        except ZeroDivisionError:
+            self.clear('')
+        except Exception as err:
+            print('error')
+            print(err)
+
+    def score(self, symbol: str):
+        pre_symbol: str = self.text
+        # Remove the first zero
+        if pre_symbol == '0':
+            pre_symbol = ''
+        if symbol == '√':
+            if self.text[0] == '0':
+                self.text = self.text[1:]
+            self.text = f'√{self.text}'
+        else:
+            self.text = f'{pre_symbol}{symbol}'
+        self.setScore()
+
+    def setScore(self):
+        self.label_score.setText(self.text)
+
+    def setHistory(self):
+        self.label_history.setText(self.value)
+
+    def getScore(self):
+        return self.label_score.text()
+
+    def accuracy(self):
+        self.n = len(self.text[2:])
 
 def main():
     app = QApplication(sys.argv)
@@ -92,9 +150,3 @@ def main():
 
 if __name__ == '__main__':
     main()
-
-    # app = QApplication(sys.argv)
-    # windows = Window()
-    #
-    # windows.show()
-    # sys.exit(app.exec())
