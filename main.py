@@ -12,7 +12,7 @@ class MainWindow(QMainWindow, calc.Ui_MainWindow):
     buffer: float = 0
     operator: str = ''
     pre_operation: str = ''
-    n: int = 1
+    n: int = 2
     begin: bool = False
 
     def __init__(self):
@@ -24,6 +24,7 @@ class MainWindow(QMainWindow, calc.Ui_MainWindow):
             getattr(self, f'btn_{i}').pressed.connect(lambda n=i: self.numpad(n))
         # Setup other buttons
         self.btn_point.pressed.connect(lambda: self.real())
+        self.btn_reverse.pressed.connect(lambda: self.reverse())
 
         self.btn_equal.pressed.connect(lambda: self.equal())
         self.btn_plus.pressed.connect(lambda: self.operation('+'))
@@ -33,10 +34,21 @@ class MainWindow(QMainWindow, calc.Ui_MainWindow):
 
         self.btn_backspace.pressed.connect(lambda: self.backspace())
         self.btn_C.pressed.connect(lambda: self.clear())
+        self.btn_CE.pressed.connect(lambda: self.ce())
         self.btn_sqrt.pressed.connect(lambda: self.sqrt())
         self.btn_percent.pressed.connect(lambda: self.operation('%'))
 
         self.show()
+
+    def reverse(self):
+        self.text = str(eval(f'-1*{self.text}'))
+        self.setScore()
+
+    def ce(self):
+        self.text = '0'
+        self.setScore()
+        self.root = False
+        self.point = False
 
     def clear(self, zero=None):
         self.text = '0'
