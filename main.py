@@ -1,8 +1,7 @@
 import sys
 from PyQt5.QtWidgets import QApplication, QMainWindow
 import calc
-from math import sqrt
-
+from math import sqrt, floor, ceil
 
 class MainWindow(QMainWindow, calc.Ui_MainWindow):
     text: str = ''
@@ -14,11 +13,13 @@ class MainWindow(QMainWindow, calc.Ui_MainWindow):
     buffer: float = 0
     operator: str = ''
     pre_operation: str = ''
-    n:int = 1
+    n: int = 1
+    begin: bool = False
 
     def __init__(self):
         QMainWindow.__init__(self)
         self.setupUi(self)
+        self.begin = True
         # Setup buttons numpad
         for i in range(10):
             getattr(self, f'btn_{i}').pressed.connect(lambda n=i: self.numpad(n))
@@ -35,6 +36,7 @@ class MainWindow(QMainWindow, calc.Ui_MainWindow):
         self.btn_C.pressed.connect(lambda: self.clear())
         self.btn_sqrt.pressed.connect(lambda: self.sqrt())
         self.btn_percent.pressed.connect(lambda: self.operation('%'))
+
         self.show()
 
     def clear(self, zero=None):
@@ -70,10 +72,12 @@ class MainWindow(QMainWindow, calc.Ui_MainWindow):
         self.text = '0'
         self.setScore()
         self.point = False
+        self.root = False
 
     def equal(self):
         if self.point:
-            setup: set = set(self.text.split('.')).discard('0')
+            setup: set = set([x for x in self.text if x != '.'])
+            setup.discard('0')
             if len(setup) == 0:
                 self.accuracy()
         self.operation()
@@ -88,13 +92,17 @@ class MainWindow(QMainWindow, calc.Ui_MainWindow):
             # Setup the first value
             if self.value == '' and not self.root:
                 self.value = f'{self.text}{self.operator}'
+                self.begin = True
             elif self.pre_operation == '%':
-                self.value = f'{self.buffer}{self.operator}'
+                self.value = f'{self.buffer}{self.operator} '
             # Calculate
             elif self.root:
-                self.buffer = round(eval(f'{self.value[:-1]}{self.pre_operation}{sqrt(self.text[1:])}')+0.1,self.n)
-                self.value = str(self.buffer)
-                self.root = False
+                # Crutch for the empty value of the root argument
+                if self.text == '√':
+                    self.text = '√0'
+                self.buffer = round(eval(f'{self.value[:-1]}{self.pre_operation}sqrt({self.text[1:]})'), self.n)
+                self.value = f'{self.buffer} '
+                # self.root = False
             elif self.operator == '%':
                 percent = eval(f'{self.value[:-1]}/100*{self.text}')
                 switch = {
@@ -103,13 +111,21 @@ class MainWindow(QMainWindow, calc.Ui_MainWindow):
                     '-': f'{self.value}{percent}',
                     '/': f'{self.value[:-1]}*{percent}',
                 }
-                self.buffer = round(eval(f'{switch.get(self.pre_operation)}')+0.1,self.n)
-                self.value = str(self.buffer)
+                self.buffer = round(eval(f'{switch.get(self.pre_operation)}'), self.n)
+                # self.value = str(self.buffer)
+                self.value = f'{self.buffer} '
                 print('self')
                 print(self.pre_operation)
             else:
-                self.buffer = round(eval(f'{self.value[:-1]}{self.pre_operation}{self.text}')+0.1,self.n)
-                self.value = f'{self.buffer}{self.operator}'
+                # Crutch for case when there is no previous operation or it is a "calculation"
+                if self.pre_operation == '':
+                    self.buffer = round(eval(f'{self.value[:-1]}'), self.n)
+                else:
+                    self.buffer = round(eval(f'{self.value[:-1]}{self.pre_operation}{self.text}'), self.n)
+                if self.operator == '':
+                    self.value = f'{self.buffer} '
+                else:
+                    self.value = f'{self.buffer}{self.operator}'
             self.setHistory()
         except ZeroDivisionError:
             self.clear('')
@@ -120,14 +136,18 @@ class MainWindow(QMainWindow, calc.Ui_MainWindow):
     def score(self, symbol: str):
         pre_symbol: str = self.text
         # Remove the first zero
-        if pre_symbol == '0':
+        if pre_symbol == '0' and not self.point:
             pre_symbol = ''
+        elif pre_symbol == '' and self.point:
+            pre_symbol = '0'
+
         if symbol == '√':
-            if self.text[0] == '0':
+            if self.label_score.text()[0] == '0':
                 self.text = self.text[1:]
             self.text = f'√{self.text}'
         else:
             self.text = f'{pre_symbol}{symbol}'
+        print(self.text)
         self.setScore()
 
     def setScore(self):
@@ -141,6 +161,7 @@ class MainWindow(QMainWindow, calc.Ui_MainWindow):
 
     def accuracy(self):
         self.n = len(self.text[2:])
+        self.clear()
 
 def main():
     app = QApplication(sys.argv)
