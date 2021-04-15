@@ -1,15 +1,14 @@
 import sys
 from PyQt5.QtWidgets import QApplication, QMainWindow
 import calc
-from math import sqrt, floor, ceil
+from math import sqrt
+
 
 class MainWindow(QMainWindow, calc.Ui_MainWindow):
     text: str = ''
     value: str = ''
-    try_history: str = ''
     point: bool = False
     root: bool = False
-    depth: int = 0
     buffer: float = 0
     operator: str = ''
     pre_operation: str = ''
@@ -52,6 +51,8 @@ class MainWindow(QMainWindow, calc.Ui_MainWindow):
         self.point = False
 
     def backspace(self):
+        if len(self.text) > 0 and self.text[-1] == '.':
+            self.point = False
         self.text = self.text[:-1]
         self.setScore()
 
@@ -73,6 +74,7 @@ class MainWindow(QMainWindow, calc.Ui_MainWindow):
         self.setScore()
         self.point = False
         self.root = False
+        self.begin = False
 
     def equal(self):
         if self.point:
@@ -112,10 +114,7 @@ class MainWindow(QMainWindow, calc.Ui_MainWindow):
                     '/': f'{self.value[:-1]}*{percent}',
                 }
                 self.buffer = round(eval(f'{switch.get(self.pre_operation)}'), self.n)
-                # self.value = str(self.buffer)
                 self.value = f'{self.buffer} '
-                print('self')
-                print(self.pre_operation)
             else:
                 # Crutch for case when there is no previous operation or it is a "calculation"
                 if self.pre_operation == '':
@@ -126,14 +125,22 @@ class MainWindow(QMainWindow, calc.Ui_MainWindow):
                     self.value = f'{self.buffer} '
                 else:
                     self.value = f'{self.buffer}{self.operator}'
+            if self.n == 0:
+                self.value = f'{int(float(self.value[:-1]))}{self.value[-1]}'
             self.setHistory()
         except ZeroDivisionError:
             self.clear('')
         except Exception as err:
-            print('error')
-            print(err)
+            print('error: ', err)
 
     def score(self, symbol: str):
+        # Clears the history field if there is no operator to interact with it
+        if (self.operator == '' or self.operator == '%') and not self.root and not self.begin:
+            self.clear()
+            # Adding zero before point in cases of operations percent, sqrt and equal
+            if symbol == '.':
+                self.point = True
+            self.begin = True
         pre_symbol: str = self.text
         # Remove the first zero
         if pre_symbol == '0' and not self.point:
@@ -162,6 +169,7 @@ class MainWindow(QMainWindow, calc.Ui_MainWindow):
     def accuracy(self):
         self.n = len(self.text[2:])
         self.clear()
+
 
 def main():
     app = QApplication(sys.argv)
