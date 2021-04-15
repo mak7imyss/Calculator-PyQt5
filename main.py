@@ -166,7 +166,6 @@ class MainWindow(QMainWindow, calc.Ui_MainWindow):
             self.text = f'√{self.text}'
         else:
             self.text = f'{pre_symbol}{symbol}'
-        print(self.text)
         self.setScore()
 
     def setScore(self):
